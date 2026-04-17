@@ -4,6 +4,9 @@
   "files.exclude": {
     "node_modules/": true,
     ".vscode": true,
+    ".npmrc": true,
+    ".gitignore": true,
+    ".nvmrc": true,
     ".tm_properties": true,
     "**/._*": true,
     "**/__generated__": true,

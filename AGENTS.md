@@ -11,7 +11,7 @@ Most users only want to implement a concrete tracker. If that is your goal, you 
 
 If you are implementing your own analytics tracker:
 
-- Copy `tracker.ts.example` to `tracker.ts`.
+- Copy `tracker.example.ts` to `tracker.ts`.
 - Edit `tracker.ts`.
 - Do not change files in `src/`.
 - Do not refactor the framework.
@@ -23,7 +23,7 @@ If you are implementing your own analytics tracker:
 
 ## Quick Start
 
-1. Copy `tracker.ts.example` to `tracker.ts`.
+1. Copy `tracker.example.ts` to `tracker.ts`.
 2. Open `tracker.ts`.
 3. Remove every handler function you do not need.
 4. Replace the `console.log(...)` examples with calls to your own analytics system.
@@ -34,7 +34,7 @@ If you are implementing your own analytics tracker:
 
 If you are only implementing a tracker, these are the only files you normally need:
 
-- `tracker.ts.example`
+- `tracker.example.ts`
 - `tracker.ts`
 - `src/types.ts`
 
@@ -54,7 +54,7 @@ If you are not working on the framework itself, ignore these files:
 
 The normal workflow for a custom tracker is:
 
-1. Copy `tracker.ts.example` to `tracker.ts`.
+1. Copy `tracker.example.ts` to `tracker.ts`.
 2. Delete the handlers you do not need.
 3. Implement the handlers you do need.
 4. Run `npm run build`.
@@ -331,7 +331,7 @@ Useful commands:
 - `npm run typecheck` runs TypeScript checks
 - `npm test` currently runs typecheck
 
-If `tracker.ts` does not exist, `npm run build` will fail and tell you to copy `tracker.ts.example` first.
+If `tracker.ts` does not exist, `npm run build` will fail and tell you to copy `tracker.example.ts` first.
 
 ## If You Actually Want To Change The Framework
 
@@ -350,7 +350,7 @@ If you are only implementing a concrete tracker, stop before doing any of that.
 
 If your task is "implement our analytics tracker", then your job is almost certainly:
 
-- copy `tracker.ts.example` to `tracker.ts`
+- copy `tracker.example.ts` to `tracker.ts`
 - remove unused handlers
 - fill in the remaining handlers
 - run `npm run build`

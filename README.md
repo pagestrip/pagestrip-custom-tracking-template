@@ -4,7 +4,7 @@ A small TypeScript framework for integrating custom analytics tracking into page
 
 The main idea is simple:
 
-- copy `tracker.ts.example` to `tracker.ts`
+- copy `tracker.example.ts` to `tracker.ts`
 - implement the tracking callbacks you need
 - build a browser bundle
 
@@ -26,7 +26,7 @@ Most users only need the second one.
 1. Copy the example file:
 
    ```bash
-   cp tracker.ts.example tracker.ts
+   cp tracker.example.ts tracker.ts
    ```
 
 2. Open `tracker.ts`
@@ -50,7 +50,7 @@ manager.
 
 If you are implementing a concrete tracker, focus on:
 
-- `tracker.ts.example`
+- `tracker.example.ts`
 - `tracker.ts`
 - `src/types.ts`
 
@@ -92,6 +92,7 @@ The framework supports these optional callbacks:
 - `trackAudioProgress(root, audioId, percent, navigationState)`
 - `trackVideoStart(root, videoId, navigationState)`
 - `trackVideoProgress(root, videoId, percent, navigationState)`
+- `trackModalElement(root, event, modalName, openMillis, navigationState)`
 
 See `src/types.ts` for the exact TypeScript signatures.
 
@@ -188,6 +189,20 @@ tracker.start({
 
 Most users do not need this.
 
+## Debugging/Testing
+
+The tracker exposes the method `.setGlobalLogLevel(level)`, where possible
+levels are `"info"`, `"warn"` (the default), and `"error"`. If you set the log
+level to `"info"`, the framework will log verbose information about tracking
+events and internal states to the browser console (thus, this is not recommend
+for deployment builds).
+
+The log level is also exposed via a global property `__pthLogLevel` on
+`window`, which represents levels from `"info`" (1) to `"error"` (3) as
+integers. You can manually change the log level through your browser dev tools
+by changing the value at runtime, which is useful when examining issues on the
+production deployment.
+
 ## Example Pattern
 
 ```ts
@@ -229,7 +244,7 @@ npm run build
 
 Bundles `tracker.ts` into `dist/tracker.js`.
 
-If `tracker.ts` does not exist, the build will fail and tell you to copy `tracker.ts.example` first.
+If `tracker.ts` does not exist, the build will fail and tell you to copy `tracker.example.ts` first.
 
 ### `npm run typecheck`
 
@@ -252,7 +267,7 @@ If your task is "implement our analytics tracker", you almost certainly do **not
 
 If you are integrating your own analytics system, the workflow is usually just:
 
-1. copy `tracker.ts.example` to `tracker.ts`
+1. copy `tracker.example.ts` to `tracker.ts`
 2. remove unused handlers
 3. implement the remaining handlers
 4. run `npm run build`
@@ -298,3 +313,31 @@ this manually via your implementation.
 No. While we'll possibly add additional events, fixes, or improvements over
 time, we'll always keep the internally used APIs stable, so your version will
 never cease working.
+
+### Do I need to set specific configuration options in my pagestrip embed via the pagestrip cockpit?
+
+No, you don't need to if you stick to any of the presets. If you customize your
+embed settings, just be sure that you leave `Dispatch Navigation Event` at
+`Always` in your `Events & Tracking` options, since this is the primary hook
+the framework uses to detect page views and wire up the additional event
+trackers. It may also be advisable to disable `Track Navigations` and
+`Track Outbound Links` there, which manage the automatic tracking capabilities
+of your embed: Since you're using this framework to implement custom behaviors,
+you'll most likely not want the default behaviors to run additionally.
+
+### Does the framework bundle any third-party packages?
+
+No, the framework only uses `esbuild` and `typescript` as build-time
+dependencies, but doesn't package any third-party npm packages into the final
+build.
+
+### Can I use this framework to implement non-tracking related behaviors?
+
+Absolutely! The framework itself doesn't send any tracking events anywhere –
+Only if you implement this in your custom `tracker.ts`. Thus, you can use it
+for entirely different things too, like,as an example, showing your
+newsletter signup form on the second page view if people scroll to a depth of
+50%, or to automatically add your affiliate IDs to specific links in your
+pagestrip content in `trackNavigation()`. The primary use-case is implementing
+custom trackers, but in general, the framework only exposes certain content
+even to your custom method implementations – Nothing more and nothing less.
