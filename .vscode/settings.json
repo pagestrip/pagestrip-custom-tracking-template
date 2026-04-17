@@ -1,0 +1,13 @@
+{
+  "editor.tabSize": 2,
+  "editor.rulers": [80],
+  "files.exclude": {
+    "node_modules/": true,
+    ".vscode": true,
+    ".tm_properties": true,
+    "**/._*": true,
+    "**/__generated__": true,
+    "dist/": true
+  },
+  "typescript.tsdk": "node_modules/typescript/lib"
+}

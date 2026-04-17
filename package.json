@@ -1,0 +1,18 @@
+{
+  "name": "pagestrip-custom-tracking-template",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/tracker.js",
+  "scripts": {
+    "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "test -f tracker.ts || (echo 'Missing tracker.ts. Copy tracker.ts.example to tracker.ts before building.' && exit 1); esbuild tracker.ts --bundle --tree-shaking=true --minify --mangle-props='^_[^_]' --format=iife --platform=browser --target=es2015 --outfile=dist/tracker.js && tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run typecheck"
+  },
+  "author": "pagestrip",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.28.0",
+    "typescript": "^6.0.2"
+  }
+}
