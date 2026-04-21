@@ -25,7 +25,7 @@ export function log(level: TLogLevel, ...messages: (string | undefined)[]) {
 }
 
 export function nodeHandled(node: Element, guard: string) {
-  const guardAttr = `data-ps-${guard}`;
+  const guardAttr = `data-ps-pth-${guard}`;
   
   if (node.getAttribute(guardAttr) === "true") {
     return true;
@@ -38,7 +38,7 @@ export function nodeHandled(node: Element, guard: string) {
 
 export function clearNodeHandled(node: Element, guard: string) {
   if (node) {
-    node.removeAttribute(`data-ps-${guard}`);
+    node.removeAttribute(`data-ps-pth-${guard}`);
   }
 }
 

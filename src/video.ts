@@ -11,12 +11,17 @@ export type TVideoEventData = {
   event: TVideoEvent;
   root: Element;
   id: string;
+  durationSecs: number;
   pct: number;
 };
 
 const kYoutubeOrigins = new Set([
   "https://www.youtube.com",
   "https://www.youtube-nocookie.com",
+]);
+
+const kVimeoOrigins = new Set([
+  "https://player.vimeo.com",
 ]);
 
 export function setVideosObserved(
@@ -48,7 +53,11 @@ export function setVideosObserved(
     info.videos.clear();
   });
   
-  [ _trackNativeVideos, _trackYoutubeVideos ].forEach(fn => fn(
+  [
+    _trackNativeVideos,
+    _trackYoutubeVideos,
+    _trackVimeoVideos
+  ].forEach(fn => fn(
     root, info, onVideoEvent
   ));
 }
@@ -58,18 +67,16 @@ function _trackNativeVideos(
   info: TObservedRootInfo,
   onVideoEvent?: (eventData: TVideoEventData) => void
 ) {
-  const list = root.querySelectorAll("video, .kent-video-placeholder");
+  const list = root.querySelectorAll("video");
   for (let i=0; i<list.length; i++) {
     const vid = list.item(i);
-    
-    if (vid.classList.contains("kent-video-placeholder")) {
-      continue;
-    }
 
     const id = (
-      vid.querySelector("source")?.getAttribute("src") ?? "video"
+      vid.querySelector("source")?.getAttribute("src") ??
+      vid.getAttribute("src") ??
+      "video"
     ).trim();
-    const m = id.match(/([\w]+)\.[\w]+$/);
+    const m = id.match(/([\w]+)\.[\w]+(#.*)$/);
     const reportId = m && m.length > 1 ? m[1] : id;
 
     const video = vid as HTMLVideoElement;
@@ -95,78 +102,138 @@ function _trackYoutubeVideos(
   info: TObservedRootInfo,
   onVideoEvent?: (eventData: TVideoEventData) => void
 ) {
-  const ytIds: Map<string, boolean> = new Map();
-  const guardedNodes: Element[] = [];
-  const list = root.querySelectorAll(".videoFromYoutube[video-id]");
-  for (let i=0; i<list.length; i++) {
-    const vid = list.item(i);
-    
-    if (nodeHandled(vid, "tracked-video")) {
-      continue;
-    }
-
-    guardedNodes.push(vid);
-    
-    const ytId = vid.getAttribute("video-id");
-    if (ytId) {
-      ytIds.set(`yt-${ytId}`, true);
-    }
-  }
+  const knownIds = new Map<string, boolean>();
+  const idMap = new Map<string, string>();
   
-  if (ytIds.size) {
-    let lastEventVideoId = "";
+  const observeYTVideo = (event: MessageEvent<string>) => {
+    if (!kYoutubeOrigins.has(event.origin) || !event?.data) {
+      return;
+    }
+
+    let data: Record<string, any> | null = null;
+    try { data = JSON.parse(event.data); } catch (err) { return };
     
-    const fn = (event: MessageEvent<string>) => {
-      if (!kYoutubeOrigins.has(event.origin) || !event?.data) {
+    if (
+      data?.event !== 'infoDelivery' ||
+      undefined === data.id ||
+      !data.info
+    ) {
+      return;
+    }
+
+    let vId = idMap.get(data.id?.toString());
+
+    if (!vId && data?.info?.videoData?.video_id) {
+      idMap.set(data.id.toString(), (vId = data.info.videoData.video_id));
+    }
+    
+    if (!vId) {
+      return;
+    }
+
+    data = data.info as any;
+    
+    if (data) {
+      const videoId = `yt-${vId}`;
+
+      let valid = knownIds.get(videoId);
+
+      if ("boolean" !== typeof valid) {
+        const source = _getIframeByContentWindow(
+          root,
+          `iframe[src^="https://www.youtube-nocookie.com/embed/"],
+           iframe[src^="https://www.youtube.com/embed/"]`,
+          event.source
+        );
+
+        knownIds.set(videoId, (valid = !!source));
+      }
+
+      if (!valid) {
         return;
       }
 
-      let data: Record<string, any> | null = null;
-      try { data = JSON.parse(event.data); } catch (err) { return };
+      const duration = data.duration || data.progressState?.duration || 0;
       
-      if (
-        data?.event !== 'infoDelivery' ||
-        undefined === data.id ||
-        !data.info
-      ) {
-        return;
+      if (duration) {
+        _processVideoUpdate(
+          root, info, videoId, data.currentTime ?? 0,
+          duration, videoId, onVideoEvent
+        );
       }
-      
-      data = data.info as any;
-      
-      if (data) {
-        const videoId =
-          `yt-${data?.id ?? data.videoData?.video_id ?? "vid"}`;
+    }
+  };
 
-        if ("yt-vid" !== videoId) {
-          if (!ytIds.get(videoId)) {
-            // not our video.
-            return;
-          } else {
-            lastEventVideoId = videoId;
+  window.addEventListener("message", observeYTVideo);
+  
+  info.navDisposers.push(() => {
+    window.removeEventListener("message", observeYTVideo);
+  });
+}
+
+function _trackVimeoVideos(
+  root: Element,
+  info: TObservedRootInfo,
+  onVideoEvent?: (eventData: TVideoEventData) => void
+) {
+  const detectVimeoVideoReady = (event: MessageEvent<string>) => {
+    if (!kVimeoOrigins.has(event.origin) || !event?.data) {
+      return;
+    }
+
+    let data: Record<string, any> | null = null;
+    try { data = JSON.parse(event.data); } catch (err) { return };
+    
+    if (data?.event !== 'ready') {
+      return;
+    }
+
+    const source = _getIframeByContentWindow(
+      root,
+      `iframe[src^="https://player.vimeo.com/video/"]`,
+      event.source
+    );
+
+    if (
+      source &&
+      (window as any)?.Vimeo?.Player
+    ) {
+      const vId = _getVideoIdFromIframe(source, "videoFromVimeo");
+
+      if (!!vId && !nodeHandled(source, "vimeo-iframe")) {
+        const videoId = `vimeo-${vId}`;
+        try {
+          const player = new (window as any).Vimeo.Player(source);
+          if (player) {
+            const fn = (ev: any) => {
+              if (
+                "number" === typeof ev?.duration && ev.duration &&
+                "number" === typeof ev?.seconds
+              ) {
+                _processVideoUpdate(
+                  root, info, videoId, ev.seconds,
+                  ev.duration, videoId, onVideoEvent
+                );
+              }
+            };
+
+            player.on("timeupdate", fn);
+
+            info.navDisposers.push(() => {
+              player.off("timeupdate", fn);
+              clearNodeHandled(source, "vimeo-iframe");
+            });
           }
-        }
-
-        const duration = data.duration || data.progressState?.duration || 0;
-        
-        if (duration) {
-          _processVideoUpdate(
-            root, info, lastEventVideoId, data.currentTime ?? 0,
-            data.duration, videoId, onVideoEvent
-          );
-        }
+        } catch (err) {}
       }
-    };
+    }
+  };
 
-    window.addEventListener("message", fn);
-    
-    info.navDisposers.push(() => {
-      window.removeEventListener("message", fn);
-      guardedNodes.forEach(node => clearNodeHandled(node, "tracked-video"));
-    });
-  } else {
-    guardedNodes.forEach(node => clearNodeHandled(node, "tracked-video"));
-  }
+  window.addEventListener("message", detectVimeoVideoReady);
+  
+  info.navDisposers.push(() => {
+    window.removeEventListener("message", detectVimeoVideoReady);
+  });
 }
 
 function _processVideoUpdate(
@@ -181,12 +248,14 @@ function _processVideoUpdate(
   const data = info.videos.get(id);
   let ttime = 0, curPct = 0, rid = reportId ?? id;
   
-  if (!fn || !totalTime || !info.active) {
+  // check curTime > half a second, so that we do not detect poster frame
+  // loading as video start.
+  if (!fn || !totalTime || !info.active || curTime < 0.5) {
     return;
   }
   
   if (!data) {
-    fn({ root, event: "started", id: rid, pct: 0});
+    fn({ root, event: "started", id: rid, pct: 0, durationSecs: totalTime });
     ttime = totalTime;
   } else {
     ttime = data.duration;
@@ -202,7 +271,7 @@ function _processVideoUpdate(
       pp.push(q);
     }
     pp.reverse().forEach(qq => {
-      fn({ root, event: "progress", id: rid, pct: qq });
+      fn({ root, event: "progress", id: rid, pct: qq, durationSecs: ttime });
     });
   }
   
@@ -211,4 +280,43 @@ function _processVideoUpdate(
     pct: pct > curPct ? pct : curPct,
     reportId: rid
   });
+}
+
+function _getIframeByContentWindow(
+  root: Element,
+  selector: string,
+  sourceObject: MessageEventSource | null
+) {
+  if (null === sourceObject) {
+    return undefined;
+  }
+
+  let source: HTMLIFrameElement | undefined = undefined;
+  const elements: NodeListOf<HTMLIFrameElement> = root.querySelectorAll(
+    selector
+  );
+
+  for (let i=0; i<elements.length; i++) {
+    const el = elements.item(i);
+    if (el.contentWindow === sourceObject) {
+      source = el;
+      break;
+    }
+  }
+
+  return source;
+}
+
+function _getVideoIdFromIframe(
+  iframe: HTMLIFrameElement,
+  className: string
+) {
+  let p = iframe.parentElement;
+  while (p) {
+    if (p.classList.contains(className)) {
+      return p.getAttribute("video-id") || undefined;
+    }
+    p = p.parentElement;
+  }
+  return undefined;
 }

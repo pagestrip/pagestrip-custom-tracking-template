@@ -1,5 +1,10 @@
 import type { TObservedRootInfo } from "./types_priv";
-import { log, registerGuardedListeners } from "./util";
+import {
+  log,
+  registerGuardedListeners,
+  nodeHandled,
+  clearNodeHandled
+} from "./util";
 
 type TAudioEvent = "started" | "progress";
 export type TAudioEventData = {
@@ -7,6 +12,7 @@ export type TAudioEventData = {
   root: Element;
   id: string;
   pct: number;
+  durationSecs: number;
 };
 
 export function setAudioObserved(
@@ -17,6 +23,21 @@ export function setAudioObserved(
 ) {
   if (!observed || !root) {
     return;
+  }
+
+  if (!nodeHandled(root, "detect-audio")) {
+    const fn = () => {
+      if (info.active) {
+        setAudioObserved(root, info, true, onAudioEvent);
+      }
+    };
+    
+    root.addEventListener("loadstart", fn, { capture: true });
+    
+    info.navDisposers.push(() => {
+      root.removeEventListener("loadstart", fn, { capture: true });
+      clearNodeHandled(root, "detect-audio");
+    });
   }
 
   info.navDisposers.push(() => {
@@ -68,7 +89,7 @@ function _processAudioUpdate(
   }
 
   if (!data) {
-    fn({ root, event: "started", id: rid, pct: 0 });
+    fn({ root, event: "started", id: rid, pct: 0, durationSecs: totalTime });
     ttime = totalTime;
   } else {
     ttime = data.duration;
@@ -84,7 +105,7 @@ function _processAudioUpdate(
       pp.push(q);
     }
     pp.reverse().forEach(qq => {
-      fn({ root, event: "progress", id: rid, pct: qq });
+      fn({ root, event: "progress", id: rid, pct: qq, durationSecs: ttime });
     });
   }
 

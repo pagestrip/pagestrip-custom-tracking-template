@@ -40,6 +40,9 @@ const kDefaultOptions: TTrackerOptions = {
 const kAfterNavRetryMillis = 1500;
 const kDefaultSelector = ".pagestrip-root";
 
+const kPSNavigateEventName = "psNavigate";
+const kPSAPIReadyEventName = "psApiReady";
+
 export class PSTracker {
   private _observedElements: WeakMap<Element, TObservedRootInfo> =
     new WeakMap();
@@ -105,8 +108,10 @@ export class PSTracker {
     let newTrackers = false;
     
     list.forEach(el => {
-      newTrackers ||=
-        this._attachToElement(el, selector ?? kDefaultSelector, inOptions);
+      const isNew = this._attachToElement(
+        el, selector ?? kDefaultSelector, inOptions
+      );
+      newTrackers ||= isNew;
     });
     
     if (newTrackers) {
@@ -132,7 +137,23 @@ export class PSTracker {
     this._selectors.forEach(selector => {
       this.stop(selector);
     });
+
+    this._selectors.forEach(selector => {
+      try {
+        const els = document.querySelectorAll(selector);
+        if (els?.length) {
+          for (let i=0; i<els.length; i++) {
+            this._detachElement(els.item(i));
+          }
+        }
+      } catch (err) {
+        log("warn", `error while disposing tracked elements: ${err}`);
+      }
+    });
+
     this._selectors.clear();
+
+    log("info", `tracker disposed after DOM removal.`);
   }
 
   private _attachToElement(
@@ -177,17 +198,16 @@ export class PSTracker {
           videos: new Map(),
           active: true,
           lastNavEvent: null,
-          lastTimestamp: 0
-        });
-
-        observeDOMAttachment(element, () => {
-          this._onElementDidDOMDetach(element);
+          lastTimestamp: 0,
+          domDetachDisposer: observeDOMAttachment(element, () => {
+            this._onElementDidDOMDetach(element);
+          })
         });
 
         this._selectors.add(selector);
       }
       
-      element.addEventListener("psNavigate" as any, listener);
+      element.addEventListener(kPSNavigateEventName as any, listener);
       newTracker = true;
     } else if (existingInfo) {
       existingInfo.options = nextOptions;
@@ -207,7 +227,9 @@ export class PSTracker {
     if (info?.active) {
       info.active = false;
       info.lastNavEvent = null;
-      el.removeEventListener("psNavigate" as any, info.listener);
+      info.domDetachDisposer?.();
+      info.domDetachDisposer = undefined;
+      el.removeEventListener(kPSNavigateEventName as any, info.listener);
       this._disposeAfterNav(info);
     }
   }
@@ -215,6 +237,7 @@ export class PSTracker {
   private _onElementDidDOMDetach(el: Element) {
     this._detachElement(el);
     this._observedElements.delete(el);
+    log("info", "detached from element after DOM removal.");
   }
 
   private _startSelectorWatch(
@@ -224,7 +247,7 @@ export class PSTracker {
     const selector = inSelector ?? kDefaultSelector;
 
     if (0 === this._watchedSelectors.size) {
-      document.addEventListener("psApiReady" as any, this._onApiInit);
+      document.addEventListener(kPSAPIReadyEventName as any, this._onApiInit);
     }
 
     this._watchedSelectors.set(selector, { ...(options ?? {}) });
@@ -234,7 +257,7 @@ export class PSTracker {
     const selector = inSelector ?? kDefaultSelector;
     this._watchedSelectors.delete(selector);
     if (0 === this._watchedSelectors.size) {
-      document.removeEventListener("psApiReady" as any, this._onApiInit);
+      document.removeEventListener(kPSAPIReadyEventName as any, this._onApiInit);
     }
   }
 
@@ -268,7 +291,10 @@ export class PSTracker {
           log("info", `track navigation: ${event.standardizedURL}`);
           
           try {
-            this._impl.trackNavigation(element, event);
+            this._impl.trackNavigation({
+              root: element, 
+              navigationState: event
+            });
           } catch (err) {
             log(
               "warn",
@@ -327,7 +353,10 @@ export class PSTracker {
         setAudioObserved(
           element,
           info,
-          !!(current?.trackAudioStart || current?.trackAudioProgress),
+          !!(
+            (current?.trackAudioStart && this._impl.trackAudioStart) ||
+            (current?.trackAudioProgress && this._impl.trackAudioProgress)
+          ),
           this._onAudioEvent.bind(this)
         );
       }
@@ -339,7 +368,10 @@ export class PSTracker {
         setVideosObserved(
           element,
           info,
-          !!(current?.trackVideoStart || current?.trackVideoProgress),
+          !!(
+            (current?.trackVideoStart && this._impl.trackVideoStart) ||
+            (current?.trackVideoProgress && this._impl.trackVideoProgress)
+          ),
           this._onVideoEvent.bind(this)
         );
       }
@@ -348,7 +380,7 @@ export class PSTracker {
         setDwellObserved(
           element,
           info,
-          !!current?.trackDwell,
+          !!(current?.trackDwell && this._impl.trackDwell),
           this._onDwellEvent.bind(this)
         );
       }
@@ -357,7 +389,7 @@ export class PSTracker {
         setScrollDepthObserved(
           element,
           info,
-          !!current?.trackScrollDepth,
+          !!(current?.trackScrollDepth && this._impl.trackScrollDepth),
           this._onScrollDepthEvent.bind(this)
         );
       }
@@ -366,7 +398,7 @@ export class PSTracker {
         trackExternalLinks(
           element,
           info,
-          !!current?.trackExternalLinks,
+          !!(current?.trackExternalLinks && this._impl.trackExternalLink),
           this._onExternalLinkEvent.bind(this)
         );
       }
@@ -375,7 +407,7 @@ export class PSTracker {
         setModalsObserved(
           element,
           info,
-          !!current?.trackModals,
+          !!(current?.trackModals && this._impl.trackModalElement),
           this._onModalEvent.bind(this)
         );
       }
@@ -387,36 +419,54 @@ export class PSTracker {
     if (info) {
       this._disposeAfterNav(info);
       
-      this._executeNavReaction(info, () => {
-        setAudioObserved(
-          el,
-          info,
-          !!(info.options?.trackAudioStart||info.options?.trackAudioProgress),
-          this._onAudioEvent.bind(this)
-        );
-
-        setVideosObserved(
-          el,
-          info,
-          !!(info.options?.trackVideoStart||info.options?.trackVideoProgress),
-          this._onVideoEvent.bind(this)
-        );
-      });
-      
-      if (info.options.trackDwell) {
-        setDwellObserved(el, info, true, this._onDwellEvent.bind(this));
+      if (!!(
+        (info.options?.trackVideoStart && this._impl.trackVideoStart) ||
+        (info.options?.trackVideoProgress && this._impl.trackVideoProgress)
+      )) {
+        this._executeNavReaction(info, () => {
+          setVideosObserved(
+            el, info, true, this._onVideoEvent.bind(this)
+          );
+        });
       }
 
-      if (info.options.trackScrollDepth) {
-        setScrollDepthObserved(el, info, true, this._onScrollDepthEvent.bind(this));
+      if (!!(
+        (info.options?.trackAudioStart && this._impl.trackAudioStart) ||
+        (info.options?.trackAudioProgress && this._impl.trackAudioProgress)
+      )) {
+        this._executeNavReaction(info, () => {
+          setAudioObserved(
+            el, info, true, this._onAudioEvent.bind(this)
+          );
+        });
       }
       
-      if (info.options?.trackExternalLinks) {
-        trackExternalLinks(el, info, true, this._onExternalLinkEvent.bind(this));
+      if (info.options.trackDwell && this._impl.trackDwell) {
+        this._executeNavReaction(info, () => {
+          setDwellObserved(el, info, true, this._onDwellEvent.bind(this));
+        });
       }
 
-      if (info.options?.trackModals) {
-        setModalsObserved(el, info, true, this._onModalEvent.bind(this));
+      if (info.options.trackScrollDepth && this._impl.trackScrollDepth) {
+        this._executeNavReaction(info, () => {
+          setScrollDepthObserved(
+            el, info, true, this._onScrollDepthEvent.bind(this)
+          );
+        });
+      }
+      
+      if (info.options?.trackExternalLinks && this._impl.trackExternalLink) {
+        this._executeNavReaction(info, () => {
+          trackExternalLinks(
+            el, info, true, this._onExternalLinkEvent.bind(this)
+          );
+        });
+      }
+
+      if (info.options?.trackModals && this._impl.trackModalElement) {
+        this._executeNavReaction(info, () => {
+          setModalsObserved(el, info, true, this._onModalEvent.bind(this));
+        });
       }
     }
   }
@@ -439,7 +489,12 @@ export class PSTracker {
           fn = (event) => {
             if (this._impl.trackVideoStart) {
               log("info", `track video started`, data.id);
-              this._impl.trackVideoStart(data.root, data.id, event);
+              this._impl.trackVideoStart({
+                root: data.root,
+                videoId: data.id,
+                durationSecs: data.durationSecs,
+                navigationState: event
+              });
             }
           };
           break;
@@ -451,7 +506,13 @@ export class PSTracker {
           fn = (event) => {
             if (this._impl.trackVideoProgress) {
               log("info", `track video progress`, data.id,data.pct.toString());
-              this._impl.trackVideoProgress(data.root, data.id, data.pct, event);
+              this._impl.trackVideoProgress({
+                root: data.root,
+                videoId: data.id,
+                durationSecs: data.durationSecs,
+                percent: data.pct,
+                navigationState: event
+              });
             }
           };
           break;
@@ -483,7 +544,12 @@ export class PSTracker {
           fn = (event) => {
             if (this._impl.trackAudioStart) {
               log("info", `track audio started`, data.id);
-              this._impl.trackAudioStart(data.root, data.id, event);
+              this._impl.trackAudioStart({
+                root: data.root,
+                audioId: data.id,
+                durationSecs: data.durationSecs,
+                navigationState: event
+              });
             }
           };
           break;
@@ -495,7 +561,13 @@ export class PSTracker {
           fn = (event) => {
             if (this._impl.trackAudioProgress) {
               log("info", `track audio progress`, data.id, data.pct.toString());
-              this._impl.trackAudioProgress(data.root, data.id, data.pct, event);
+              this._impl.trackAudioProgress({
+                root: data.root,
+                audioId: data.id,
+                durationSecs: data.durationSecs,
+                percent: data.pct,
+                navigationState: event
+              });
             }
           };
           break;
@@ -522,7 +594,11 @@ export class PSTracker {
       this._impl.trackDwell
         ? (event) => {
             log("info", `track dwell`, data.seconds.toString());
-            this._impl.trackDwell?.(data.root, data.seconds, event);
+            this._impl.trackDwell?.({
+              root: data.root,
+              seconds: data.seconds,
+              navigationState: event
+            });
           }
         : undefined,
       `exception while tracking dwell ${data.seconds}`
@@ -541,7 +617,12 @@ export class PSTracker {
       !!info?.options?.trackExternalLinks,
       this._impl.trackExternalLink
         ? (event) => {
-            this._impl.trackExternalLink?.(data.root, data.url, event);
+            this._impl.trackExternalLink?.({
+              root: data.root,
+              url: data.url,
+              target: data.target,
+              navigationState: event
+            });
           }
         : undefined,
       `exception while tracking external link ${data.url}`
@@ -561,7 +642,11 @@ export class PSTracker {
       this._impl.trackScrollDepth
         ? (event) => {
             log("info", `track scroll depth`, data.percent.toString());
-            this._impl.trackScrollDepth?.(data.root, data.percent, event);
+            this._impl.trackScrollDepth?.({
+              root: data.root,
+              percent: data.percent,
+              navigationState: event
+            });
           }
         : undefined,
       `exception while tracking scroll depth ${data.percent}`
@@ -587,10 +672,13 @@ export class PSTracker {
                 ? `, duration: ${data.openMillis}ms` : "" 
             }`);
 
-            this._impl.trackModalElement?.(
-              data.root, data.event, data.name, data.openMillis ?? null,
-              event
-            );
+            this._impl.trackModalElement?.({
+              root: data.root,
+              event: data.event,
+              modalName: data.name,
+              openMillis: data.openMillis ?? null,
+              navigationState: event
+            });
           }
         : undefined,
       `exception while tracking modal ${data.event}`

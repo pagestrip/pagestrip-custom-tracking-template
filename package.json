@@ -1,6 +1,6 @@
 {
   "name": "pagestrip-custom-tracking-template",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A small TypeScript framework for integrating custom analytics tracking into pagestrip-powered content.",
   "main": "dist/tracker.js",
   "engines": {

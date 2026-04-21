@@ -82,17 +82,18 @@ For most integrations:
 
 ## Available Hooks
 
-The framework supports these optional callbacks:
+The framework supports these optional callbacks (Refer to the Typescript types
+for the individual shapes of the passed event object):
 
-- `trackNavigation(root, event)`
-- `trackExternalLink(root, url, navigationState)`
-- `trackDwell(root, seconds, navigationState)`
-- `trackScrollDepth(root, percent, navigationState)`
-- `trackAudioStart(root, audioId, navigationState)`
-- `trackAudioProgress(root, audioId, percent, navigationState)`
-- `trackVideoStart(root, videoId, navigationState)`
-- `trackVideoProgress(root, videoId, percent, navigationState)`
-- `trackModalElement(root, event, modalName, openMillis, navigationState)`
+- `trackNavigation(event)`
+- `trackExternalLink(event)`
+- `trackDwell(event)`
+- `trackScrollDepth(event)`
+- `trackAudioStart(event)`
+- `trackAudioProgress(event)`
+- `trackVideoStart(event)`
+- `trackVideoProgress(event)`
+- `trackModalElement(event)`
 
 See `src/types.ts` for the exact TypeScript signatures.
 
@@ -209,22 +210,22 @@ production deployment.
 import { PSTracker } from "./src/lib";
 
 const tracker = new PSTracker({
-  trackNavigation: (_root, event) => {
+  trackNavigation: event => {
     window.dataLayer?.push({
       event: "ps_page_view",
-      url: event.standardizedURL,
-      title: event.title,
-      contentType: event.contentType,
-      language: event.language,
+      url: event.navigationState.standardizedURL,
+      title: event.navigationState.title,
+      contentType: event.navigationState.contentType,
+      language: event.navigationState.language,
     });
   },
 
-  trackScrollDepth: (_root, percent, nav) => {
+  trackScrollDepth: event => {
     window.dataLayer?.push({
       event: "ps_scroll_depth",
-      percent,
-      url: nav.standardizedURL,
-      title: nav.title,
+      percent: event.percent,
+      url: event.navigationState.standardizedURL,
+      title: event.navigationState.title,
     });
   },
 });

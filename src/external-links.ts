@@ -4,6 +4,7 @@ import { registerGuardedListeners } from "./util";
 export type TExternalLinkEventData = {
   root: Element;
   url: string;
+  target: string;
 };
 
 function normalizeHostname(hostname: string) {
@@ -31,37 +32,48 @@ function resolveExternalURL(href: string, currentHost: string) {
 }
 
 export function trackExternalLinks(
-  el: Element,
+  root: Element,
   info: TObservedRootInfo,
   enabled: boolean,
   onExternalLinkEvent?: (eventData: TExternalLinkEventData) => void
 ) {
-  if (!el || !info || !enabled) {
+  if (!root || !info || !enabled) {
     return;
   }
 
   const host = location.hostname;
-  const links = Array.from(el.querySelectorAll("a, *[role=\"link\"]"));
 
-  links.forEach(link => {
-    const href = link.getAttribute("href");
-    if (!href || link.getAttribute("data-ps-ext-link") === "true") {
-      return;
-    }
+  const checkLinkClick = (ev: MouseEvent) => {
+    if (ev.target instanceof Element) {
+      const pLink = ev.target.closest("a, *[role=\"link\"]");
+      
+      if (pLink) {
+        const href = pLink.getAttribute("href");
+        if (!href || pLink.getAttribute("data-ps-ext-link") === "true") {
+          return;
+        }
 
-    const externalURL = resolveExternalURL(href, host);
-    if (!externalURL) {
-      return;
-    }
+        const externalURL = resolveExternalURL(href, host);
+        if (!externalURL) {
+          return;
+        }
 
-    const fn = () => {
-      if (info.active && info.options?.trackExternalLinks && onExternalLinkEvent) {
-        onExternalLinkEvent({ root: el, url: externalURL });
+        if (
+          info.active &&
+          info.options?.trackExternalLinks &&
+          onExternalLinkEvent
+        ) {
+          onExternalLinkEvent({
+            root,
+            url: externalURL,
+            target: pLink.getAttribute("target") || "_self"
+          });
+        }
       }
-    };
+    }
+  };
 
-    registerGuardedListeners(info, link, link, "ext-link", {
-      click: fn,
-    }, { capture: true });
-  });
+  registerGuardedListeners(info, root, root, "ext-link", {
+    mousedown: checkLinkClick as EventListener
+  }, { capture: true });
 }

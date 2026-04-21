@@ -3,84 +3,44 @@ import type { TPSNavigationEvent, TTrackerImpl } from "./src/types";
 
 const tracker = new PSTracker({
   // Called when Pagestrip navigates to new content.
-  trackNavigation: (_root: Element, event: TPSNavigationEvent) => {
-    console.log("NAVIGATION", event);
+  trackNavigation: event => {
+    console.log("NAVIGATION", event.navigationState.standardizedURL);
   },
   
   // Called when a user clicks an outbound link.
-  trackExternalLink: (
-    _root: Element,
-    url: string,
-    _navigationState: TPSNavigationEvent
-  ) => {
-    console.log("EXT LINK", url);
+  trackExternalLink: event => {
+    console.log("EXT LINK", event.url);
   },
   
   // Called every 5 seconds while content is visible.
-  trackDwell: (
-    _root: Element,
-    seconds: number,
-    _navigationState: TPSNavigationEvent
-  ) => {
-    console.log("DWELL", seconds);
+  trackDwell: event => {
+    console.log("DWELL", event.seconds);
   },
   
   // Called in 10% read-depth steps.
-  trackScrollDepth: (
-    _root: Element,
-    percent: number,
-    _navigationState: TPSNavigationEvent
-  ) => {
-    console.log("SCROLL DEPTH", percent);
+  trackScrollDepth: event => {
+    console.log("SCROLL DEPTH", event.percent);
   },
 
-  // Called once when audio playback starts.
-  trackAudioStart: (
-    _root: Element,
-    audioId: string,
-    _navigationState: TPSNavigationEvent
-  ) => {
-    console.log("AUDIO STARTED", audioId);
+  trackAudioStart: event => {
+    console.log("AUDIO STARTED", event.audioId);
   },
 
-  // Called in 10% audio progress steps.
-  trackAudioProgress: (
-    _root: Element,
-    audioId: string,
-    percent: number,
-    _navigationState: TPSNavigationEvent
-  ) => {
-    console.log("AUDIO PROGRESS", audioId, percent);
+  trackAudioProgress: event => {
+    console.log("AUDIO PROGRESS", event.audioId, event.percent);
   },
   
-  // Called once when video playback starts.
-  trackVideoStart: (
-    _root: Element,
-    videoId: string,
-    _navigationState: TPSNavigationEvent
-  ) => {
-    console.log("VIDEO STARTED", videoId);
+  trackVideoStart: event => {
+    console.log("VIDEO STARTED", event.videoId);
   },
   
-  // Called in 10% video progress steps.
-  trackVideoProgress: (
-    _root: Element,
-    videoId: string,
-    percent: number,
-    _navigationState: TPSNavigationEvent
-  ) => {
-    console.log("VIDEO PROGRESS", videoId, percent);
+  trackVideoProgress: event => {
+    console.log("VIDEO PROGRESS", event.videoId, event.percent);
   },
 
   // Called when a modal element opens or closes.
-  trackModalElement: (
-    root: Element,
-    event: "open" | "close",
-    modalName: string | null,
-    openMillis: number | null,
-    navigationState: TPSNavigationEvent
-  ) => {
-    console.log("MODAL", event, modalName, openMillis);
+  trackModalElement: event => {
+    console.log("MODAL", event.event, event.modalName, event.openMillis);
   },
 } satisfies TTrackerImpl);
 

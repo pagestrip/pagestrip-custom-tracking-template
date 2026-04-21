@@ -20,6 +20,8 @@ declare global {
   }
 }
 
+const kPSModalElementEventName = "psModalElement";
+
 export function setModalsObserved(
   root: Element,
   info: TObservedRootInfo,
@@ -48,6 +50,6 @@ export function setModalsObserved(
   };
 
   registerGuardedListeners(info, root, root, "track-modals", {
-    "psModalElement": fn as EventListener
+    [kPSModalElementEventName]: fn as EventListener
   });
 }

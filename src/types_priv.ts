@@ -20,4 +20,5 @@ export type TObservedRootInfo = {
   videos: Map<string, TMediaState>;
   options: TTrackerOptions;
   listener: (event: CustomEvent<TPSNavigationEvent>) => void;
+  domDetachDisposer?: () => void;
 }

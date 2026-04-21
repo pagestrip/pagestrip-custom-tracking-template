@@ -37,57 +37,65 @@ export type TTrackerOptions = {
 }
 
 export interface TTrackerImpl {
-  trackNavigation?: (root: Element, event: TPSNavigationEvent) => void;
+  trackNavigation?: (event: {
+    root: Element,
+    navigationState: TPSNavigationEvent
+  }) => void;
   
-  trackExternalLink?: (
+  trackExternalLink?: (event: {
     root: Element,
     url: string,
+    target: string,
     navigationState: TPSNavigationEvent
-  ) => void;
+  }) => void;
   
-  trackDwell?: (
+  trackDwell?: (event: {
     root: Element,
     seconds: number,
     navigationState: TPSNavigationEvent
-  ) => void;
+  }) => void;
 
-  trackScrollDepth?: (
+  trackScrollDepth?: (event: {
     root: Element,
     percent: number,
     navigationState: TPSNavigationEvent
-  ) => void;
+  }) => void;
 
-  trackAudioStart?: (
+  trackAudioStart?: (event: {
     root: Element,
     audioId: string,
+    durationSecs: number,
     navigationState: TPSNavigationEvent
-  ) => void;
+  }) => void;
 
-  trackAudioProgress?: (
+  trackAudioProgress?: (event: {
     root: Element,
     audioId: string,
+    durationSecs: number,
     percent: number,
     navigationState: TPSNavigationEvent
-  ) => void;
+  }) => void;
   
-  trackVideoStart?: (
+  trackVideoStart?: (event: {
     root: Element,
     videoId: string,
+    durationSecs: number,
     navigationState: TPSNavigationEvent
-  ) => void;
+  }) => void;
   
-  trackVideoProgress?: (
+  trackVideoProgress?: (event: {
     root: Element,
     videoId: string,
+    durationSecs: number,
     percent: number,
     navigationState: TPSNavigationEvent
-  ) => void;
+  }) => void;
 
-  trackModalElement?: (
+  trackModalElement?: (event: {
     root: Element,
     event: "open" | "close",
     modalName: string | null,
     openMillis: number | null,
     navigationState: TPSNavigationEvent
-  ) => void;
+  }) => void;
 }

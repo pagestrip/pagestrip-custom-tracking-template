@@ -6,6 +6,7 @@ export function observeDOMAttachment(
 ) {
   let mut: MutationObserver | undefined = (element as any)[kMutKey];
   let parents: Map<Node, boolean> | undefined = new Map();
+  let active = true;
 
   if (!mut && element.parentElement) {
     mut =
@@ -23,6 +24,7 @@ export function observeDOMAttachment(
               if (node && parents.get(node)) {
                 setTimeout(() => {
                   if (mut) {
+                    active = false;
                     mut.disconnect();
                   }
 
@@ -67,5 +69,10 @@ export function observeDOMAttachment(
     (element as any)[kMutKey] = mut;
   }
 
-  return () => mut?.disconnect?.();
+  return () => {
+    if (active) {
+      active = false;
+      mut?.disconnect?.();
+    }
+  }
 }

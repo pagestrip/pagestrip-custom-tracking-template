@@ -123,17 +123,18 @@ If you are unsure, keep `tracker.start()` without options.
 
 ## Available Hooks
 
-The framework currently supports these optional handler methods on `TTrackerImpl`:
+The framework currently supports these optional handler methods on
+`TTrackerImpl` (The `event` argument is fully typed, so refer to those types):
 
-- `trackNavigation(root, event)`
-- `trackExternalLink(root, url, navigationState)`
-- `trackDwell(root, seconds, navigationState)`
-- `trackScrollDepth(root, percent, navigationState)`
-- `trackAudioStart(root, audioId, navigationState)`
-- `trackAudioProgress(root, audioId, percent, navigationState)`
-- `trackVideoStart(root, videoId, navigationState)`
-- `trackVideoProgress(root, videoId, percent, navigationState)`
-- `trackModalElement(root, event, modalName, openMillis, navigationState)`
+- `trackNavigation(event)`
+- `trackExternalLink(event)`
+- `trackDwell(event)`
+- `trackScrollDepth(event)`
+- `trackAudioStart(event)`
+- `trackAudioProgress(event)`
+- `trackVideoStart(event)`
+- `trackVideoProgress(event)`
+- `trackModalElement(event)`
 
 The exact TypeScript signatures live in `src/types.ts`.
 
@@ -284,22 +285,22 @@ The framework guards against exceptions in your handlers so one bad event does n
 
 ```ts
 const tracker = new PSTracker({
-  trackNavigation: (_root, event) => {
+  trackNavigation: event => {
     window.dataLayer?.push({
       event: "ps_page_view",
-      url: event.standardizedURL,
-      title: event.title,
-      contentType: event.contentType,
-      language: event.language,
+      url: event.navigationState.standardizedURL,
+      title: event.navigationState.title,
+      contentType: event.navigationState.contentType,
+      language: event.navigationState.language,
     });
   },
 
-  trackScrollDepth: (_root, percent, nav) => {
+  trackScrollDepth: event => {
     window.dataLayer?.push({
       event: "ps_scroll_depth",
-      percent,
-      url: nav.standardizedURL,
-      title: nav.title,
+      percent: event.percent,
+      url: event.navigationState.standardizedURL,
+      title: event.navigationState.title,
     });
   },
 });
